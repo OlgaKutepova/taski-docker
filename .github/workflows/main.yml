@@ -164,14 +164,17 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
-      - name: Install ssh keys and docker remote
-        run: |
-          install -m 600 -D /dev/null ~/.ssh/id_rsa
-          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.HOST }} > ~/.ssh/known_hosts
-          docker context create remote --docker host=ssh://${{ secrets.USER }}@${{ secrets.HOST }}
-          docker context use remote
-          scp -i "C:\Dev\vm_access\yc-kolleo" docker-compose.production.yml ${{ secrets.USER }}@${{ secrets.HOST }}:/home/${{ secrets.USER }}/kittygram/docker-compose.production.yml
+      # Копируем docker-compose.production.yml на продакшен-сервер
+      - name: Copy docker-compose.yml via ssh
+        uses: appleboy/scp-action@master
+      # Передаём параметры для action appleboy/scp-action:
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USER }}
+          key: ${{ secrets.SSH_KEY }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
+          source: "docker-compose.production.yml"
+          target: home/yc-user/taski
       - name: Executing remote ssh commands to deploy
         uses: appleboy/ssh-action@master
         with:
@@ -183,7 +186,7 @@ jobs:
           # которые нужно выполнить на сервере, 
           # с которым установлено соединение
           script: |
-            cd taski
+            cd home/yc-user/taski
             # Выполняет pull образов с Docker Hub
             sudo docker compose -f docker-compose.production.yml pull
             # Перезапускает все контейнеры в Docker Compose
